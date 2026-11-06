@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shell:
+    name: Shell syntax and ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Find shell scripts
+        run: |
+          git ls-files -z | while IFS= read -r -d '' f; do
+            case "$f" in *.png|*.jpg|*.webp|*.ttf|*.svg|*.svgz) continue;; esac
+            [ -f "$f" ] || continue
+            first=$(head -n1 "$f" | tr -d '\0' | head -c 200)
+            if printf '%s' "$first" | grep -aqE '^#!.*[/ ](ba)?sh( |$)'; then
+              echo "$f"
+            elif [[ "$f" == *.sh ]] && ! printf '%s' "$first" | grep -aq '^#!'; then
+              echo "$f"
+            fi
+          done > "$RUNNER_TEMP/scripts.txt"
+          cat "$RUNNER_TEMP/scripts.txt"
+      - name: bash -n
+        run: xargs -a "$RUNNER_TEMP/scripts.txt" -r -d '\n' -n1 bash -n
+      - name: ShellCheck
+        run: xargs -a "$RUNNER_TEMP/scripts.txt" -r -d '\n' shellcheck -S warning
